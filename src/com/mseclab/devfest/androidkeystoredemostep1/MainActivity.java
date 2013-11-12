@@ -6,6 +6,8 @@ import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.NoSuchAlgorithmException;
 import java.security.NoSuchProviderException;
+import java.security.PrivateKey;
+import java.security.PublicKey;
 import java.util.Calendar;
 
 import javax.security.auth.x500.X500Principal;
@@ -96,64 +98,84 @@ public class MainActivity extends Activity {
 
 			switch (view.getId()) {
 			case R.id.generate_button:
-				debug("Cliccato Genera chivi");
+				debug("Cliccato Genera chiavi");
 				generaChiavi();
 				break;
 			}
 		}
 
-		private void generaChiavi() {
+		private void generaChiavi(){
+			new AsyncTask<Void, String, Void>() {
+				
+				@Override
+				protected Void doInBackground(Void... params) {
+					// TODO Auto-generated method stub
+					Context cx = getActivity();
+					// Generate a key pair inside the AndroidKeyStore
+					Calendar notBefore = Calendar.getInstance();
+					Calendar notAfter = Calendar.getInstance();
+					notAfter.add(1, Calendar.YEAR);
 
-			Context cx = getActivity();
-			// Generate a key pair inside the AndroidKeyStore
-			Calendar notBefore = Calendar.getInstance();
-			Calendar notAfter = Calendar.getInstance();
-			notAfter.add(1, Calendar.YEAR);
+					android.security.KeyPairGeneratorSpec.Builder builder = new KeyPairGeneratorSpec.Builder(
+							cx);
+					builder.setAlias(ALIAS);
+					String infocert = String.format("CN=%s, OU=%s", ALIAS,
+							cx.getPackageName());
+					builder.setSubject(new X500Principal(infocert));
+					builder.setSerialNumber(BigInteger.ONE);
+					builder.setStartDate(notBefore.getTime());
+					builder.setEndDate(notAfter.getTime());
+					KeyPairGeneratorSpec spec = builder.build();
 
-			android.security.KeyPairGeneratorSpec.Builder builder = new KeyPairGeneratorSpec.Builder(
-					cx);
-			builder.setAlias(ALIAS);
-			String infocert = String.format("CN=%s, OU=%s", ALIAS,
-					cx.getPackageName());
-			builder.setSubject(new X500Principal(infocert));
-			builder.setSerialNumber(BigInteger.ONE);
-			builder.setStartDate(notBefore.getTime());
-			builder.setEndDate(notAfter.getTime());
-			KeyPairGeneratorSpec spec = builder.build();
+					KeyPairGenerator kpGenerator;
+					KeyPair kp = null;
+					try {
+						kpGenerator = KeyPairGenerator.getInstance("RSA",
+								"AndroidKeyStore");
+						kpGenerator.initialize(spec);
+						kp = kpGenerator.generateKeyPair();
+						
+						
+						publishProgress("Generated key pair : " + kp.toString());
+						PublicKey publickey = kp.getPublic();
+						PrivateKey privateKey = kp.getPrivate();
+						publishProgress("Formato della chiave pubblica : " + publickey.getFormat());
+						publishProgress("Algoritmo utilizzato : " + publickey.getAlgorithm());
+						if(privateKey.getEncoded()==null)
+							publishProgress("Non possibile accedere direttamente alla chiave privata :-(");
+						
+					} catch (NoSuchAlgorithmException e) {
+						debug(e.toString());
+					} catch (NoSuchProviderException e) {
+						debug(e.toString());
+					} catch (InvalidAlgorithmParameterException e) {
+						debug(e.toString());
+					}
+					return null;
+				}
+				
+				 protected void onProgressUpdate(String... values) {
+				     debug(values[0]);
+				 }
 
-			KeyPairGenerator kpGenerator;
-			KeyPair kp = null;
-			try {
-				//ShowGenerating();
-				progressdialog = ProgressDialog.show(this.getActivity(), "Progress Dialog","Generating keys....",true);
-				kpGenerator = KeyPairGenerator.getInstance("RSA",
-						"AndroidKeyStore");
-				kpGenerator.initialize(spec);
-				kp = kpGenerator.generateKeyPair();
-				debug("Generated key pair:" + kp.toString());
-				progressdialog.dismiss();
-
-			} catch (NoSuchAlgorithmException e2) {
-				debug(e2.toString());
-			} catch (NoSuchProviderException e2) {
-				debug(e2.toString());
-			} catch (InvalidAlgorithmParameterException e) {
-				debug(e.toString());
-			}
-
+				@Override
+		        protected void onPostExecute(Void result) {
+		            // TODO Auto-generated method stub
+					progressdialog.dismiss();
+					
+		        }
+				@Override
+		        protected void onPreExecute() {
+					progressdialog = ProgressDialog.show(getActivity(),"Please wait..." , "Generating keys...");
+		        }
+				
+			}.execute();
 			
-
+			
+			
 		}
 
-		private void ShowGenerating() {
-			progressdialog = new ProgressDialog(this.getActivity());
-			progressdialog.setTitle("Generating keys....");
-			progressdialog.setIndeterminate(false);
-			progressdialog.setProgressStyle(ProgressDialog.STYLE_SPINNER);
-			progressdialog.show();
-		}
-
-		public void debug(String message) {
+		private void debug(String message) {
 			mDebugText.append(message + "\n");
 			Log.v(TAG, message);
 		}
